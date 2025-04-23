@@ -20,5 +20,6 @@ The vision of the Decentralized Lending Platform is to democratize access to fin
 - **Collateralized Loans**: Implement a system where borrowers can provide collateral for loans, adding a layer of security for lenders.
 - **Automated Loan Settlements**: Introduce automated repayment and settlement processes that ensure timely payouts and penalties for delayed repayments.
 - **Interest Rate Algorithms**: Implement an algorithm that adjusts interest rates based on supply and demand for loans, to create a more dynamic market-driven interest rate system.
+contract address : 0x0eB1DE1739d10CB50bAF10f279e09aAC2c1120aE
 
 ![Screenshot 2025-04-23 at 2 10 08 PM](https://github.com/user-attachments/assets/f3bcf899-b72a-4f50-8c57-2e8d2f9c99f3)
