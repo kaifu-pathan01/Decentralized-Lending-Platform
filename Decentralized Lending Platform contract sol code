@@ -1,9 +1,18 @@
-/ SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract DecentralizedLending {
+    address public owner;
 
-    // Struct to represent a loan request
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this.");
+        _;
+    }
+
     struct LoanRequest {
         uint256 amount;
         uint256 interestRate;
@@ -13,18 +22,15 @@ contract DecentralizedLending {
         bool isRepaid;
     }
 
-    // Mapping to track all loan requests by their ID
     mapping(uint256 => LoanRequest) public loanRequests;
+    mapping(address => uint256[]) public borrowerLoans;
 
     uint256 public loanRequestCount;
 
-    // Event to log loan approval
     event LoanApproved(uint256 loanId, address borrower, uint256 amount, uint256 interestRate, uint256 duration);
-
-    // Event to log loan repayment
     event LoanRepaid(uint256 loanId, address borrower);
+    event OwnerWithdrawal(uint256 amount);
 
-    // Function to create a new loan request
     function createLoanRequest(uint256 _amount, uint256 _interestRate, uint256 _duration) public {
         loanRequestCount++;
         loanRequests[loanRequestCount] = LoanRequest({
@@ -35,29 +41,63 @@ contract DecentralizedLending {
             isApproved: false,
             isRepaid: false
         });
+
+        borrowerLoans[msg.sender].push(loanRequestCount);
     }
 
-    // Function to approve a loan request (only accessible by the contract owner)
-    function approveLoan(uint256 loanId) public {
+    function approveLoan(uint256 loanId) public onlyOwner {
         LoanRequest storage loan = loanRequests[loanId];
         require(!loan.isApproved, "Loan already approved.");
         loan.isApproved = true;
 
-        // Emit event
         emit LoanApproved(loanId, loan.borrower, loan.amount, loan.interestRate, loan.duration);
     }
 
-    // Function to repay the loan (borrower can repay)
     function repayLoan(uint256 loanId) public payable {
         LoanRequest storage loan = loanRequests[loanId];
         require(msg.sender == loan.borrower, "Only the borrower can repay.");
         require(loan.isApproved, "Loan not approved.");
         require(!loan.isRepaid, "Loan already repaid.");
-        require(msg.value == loan.amount + (loan.amount * loan.interestRate / 100), "Incorrect repayment amount.");
+        
+        uint256 totalRepayment = loan.amount + (loan.amount * loan.interestRate / 100);
+        require(msg.value == totalRepayment, "Incorrect repayment amount.");
 
         loan.isRepaid = true;
 
-        // Emit event
         emit LoanRepaid(loanId, loan.borrower);
+    }
+
+    // New: View function to get details of a loan
+    function getLoanDetails(uint256 loanId) public view returns (
+        uint256 amount,
+        uint256 interestRate,
+        uint256 duration,
+        address borrower,
+        bool isApproved,
+        bool isRepaid
+    ) {
+        LoanRequest storage loan = loanRequests[loanId];
+        return (
+            loan.amount,
+            loan.interestRate,
+            loan.duration,
+            loan.borrower,
+            loan.isApproved,
+            loan.isRepaid
+        );
+    }
+
+    // New: Get all loan IDs of the sender
+    function getMyLoanRequests() public view returns (uint256[] memory) {
+        return borrowerLoans[msg.sender];
+    }
+
+    // New: Withdraw ETH from the contract (only owner)
+    function withdrawRepaidLoan() public onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw.");
+        payable(owner).transfer(balance);
+
+        emit OwnerWithdrawal(balance);
     }
 }
