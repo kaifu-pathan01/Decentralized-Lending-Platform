@@ -1,17 +1,11 @@
-function cancelLoanRequest(uint256 loanId) public {
-    LoanRequest storage loan = loanRequests[loanId];
-    require(msg.sender == loan.borrower, "Only borrower can cancel.");
-    require(!loan.isApproved, "Loan already approved.");
+function createLoanRequest(uint256 amount, uint256 duration) public {
+    loanRequests[nextLoanId] = LoanRequest({
+        borrower: msg.sender,
+        amount: amount,
+        duration: duration,
+        isApproved: false
+    });
 
-    delete loanRequests[loanId];
-
-    // Remove from borrower's list
-    uint256[] storage userLoans = borrowerLoans[msg.sender];
-    for (uint256 i = 0; i < userLoans.length; i++) {
-        if (userLoans[i] == loanId) {
-            userLoans[i] = userLoans[userLoans.length - 1];
-            userLoans.pop();
-            break;
-        }
-    }
+    borrowerLoans[msg.sender].push(nextLoanId);
+    nextLoanId++;
 }
