@@ -1,11 +1,11 @@
-function createLoanRequest(uint256 amount, uint256 duration) public {
-    loanRequests[nextLoanId] = LoanRequest({
-        borrower: msg.sender,
-        amount: amount,
-        duration: duration,
-        isApproved: false
-    });
-
-    borrowerLoans[msg.sender].push(nextLoanId);
-    nextLoanId++;
+struct LoanRequest {
+    address borrower;
+    uint256 amount;
+    uint256 duration;
+    bool isApproved;
+    bool isRepaid;
 }
+
+mapping(uint256 => LoanRequest) public loanRequests;
+mapping(address => uint256[]) public borrowerLoans;
+uint256 public nextLoanId;
