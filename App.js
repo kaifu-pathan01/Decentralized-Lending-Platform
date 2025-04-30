@@ -1,58 +1,111 @@
-// app.js
+import React, { useEffect, useState } from "react";
+import Web3 from "web3";
+import ContractABI from "./DecentralizedLendingABI.json"; // Import ABI JSON file
 
-// Connect to Web3.js and the smart contract
-const Web3 = require('web3');
-const web3 = new Web3(window.ethereum);  // Connects to MetaMask or any injected Ethereum provider
+const CONTRACT_ADDRESS = "0xYourContractAddressHere";
 
-// Define the contract ABI and address (make sure to replace with your actual contract ABI and deployed address)
-const contractABI = [
-  // ABI content (should be copied from the contract ABI output)
-];
+function App() {
+  const [web3, setWeb3] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [account, setAccount] = useState("");
+  const [loanRequests, setLoanRequests] = useState([]);
+  const [form, setForm] = useState({ amount: "", interestRate: "", duration: "" });
 
-const contractAddress = "0x0eB1DE1739d10CB50bAF10f279e09aAC2c1120aE";  // Replace with your contract address
+  // Initialize web3 and contract
+  useEffect(() => {
+    const init = async () => {
+      if (window.ethereum) {
+        const web3 = new Web3(window.ethereum);
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const accounts = await web3.eth.getAccounts();
+        const contract = new web3.eth.Contract(ContractABI, CONTRACT_ADDRESS);
+        setWeb3(web3);
+        setContract(contract);
+        setAccount(accounts[0]);
+        fetchLoanRequests(contract);
+      }
+    };
+    init();
+  }, []);
 
-// Initialize the contract
-const contract = new web3.eth.Contract(contractABI, contractAddress);
+  const fetchLoanRequests = async (contractInstance) => {
+    const count = await contractInstance.methods.loanRequestCount().call();
+    const loans = [];
+    for (let i = 1; i <= count; i++) {
+      const loan = await contractInstance.methods.loanRequests(i).call();
+      loans.push({ id: i, ...loan });
+    }
+    setLoanRequests(loans);
+  };
 
-// DOM Elements
-const loanForm = document.getElementById("loan-form");
-const borrowerInput = document.getElementById("borrower-address");
-const amountInput = document.getElementById("loan-amount");
-const durationInput = document.getElementById("loan-duration");
-const requestLoanButton = document.getElementById("request-loan-btn");
-const loanList = document.getElementById("loan-list");
-
-// Request a loan
-async function requestLoan() {
-  const borrowerAddress = borrowerInput.value;
-  const amount = web3.utils.toWei(amountInput.value, 'ether'); // Converting the amount to wei
-  const duration = parseInt(durationInput.value);
-
-  const accounts = await web3.eth.getAccounts();
-  const borrower = accounts[0];
-
-  if (!borrower) {
-    alert("Please connect your wallet first.");
-    return;
-  }
-
-  try {
-    // Send transaction to the smart contract to request a loan
+  const handleCreateLoan = async () => {
+    const { amount, interestRate, duration } = form;
     await contract.methods
-      .requestLoan(amount, duration)
-      .send({ from: borrower });
+      .createLoanRequest(amount, interestRate, duration)
+      .send({ from: account });
+    fetchLoanRequests(contract);
+  };
 
-    alert("Loan request submitted!");
-    loadLoanRequests();  // Refresh the list of loan requests after submission
-  } catch (err) {
-    console.error(err);
-    alert("There was an error submitting the loan request.");
-  }
+  const handleApprove = async (loanId) => {
+    await contract.methods.approveLoan(loanId).send({ from: account });
+    fetchLoanRequests(contract);
+  };
+
+  const handleRepay = async (loan) => {
+    const repayAmount = Number(loan.amount) + (Number(loan.amount) * Number(loan.interestRate)) / 100;
+    await contract.methods.repayLoan(loan.id).send({ from: account, value: web3.utils.toWei(repayAmount.toString(), 'wei') });
+    fetchLoanRequests(contract);
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2>Decentralized Lending DApp</h2>
+      <div>
+        <h3>Create Loan Request</h3>
+        <input
+          placeholder="Amount"
+          value={form.amount}
+          onChange={(e) => setForm({ ...form, amount: e.target.value })}
+        />
+        <input
+          placeholder="Interest Rate (%)"
+          value={form.interestRate}
+          onChange={(e) => setForm({ ...form, interestRate: e.target.value })}
+        />
+        <input
+          placeholder="Duration"
+          value={form.duration}
+          onChange={(e) => setForm({ ...form, duration: e.target.value })}
+        />
+        <button onClick={handleCreateLoan}>Create Loan</button>
+      </div>
+
+      <div>
+        <h3>Loan Requests</h3>
+        {loanRequests.map((loan) => (
+          <div key={loan.id} style={{ border: "1px solid #ccc", margin: "10px", padding: "10px" }}>
+            <p><strong>ID:</strong> {loan.id}</p>
+            <p><strong>Borrower:</strong> {loan.borrower}</p>
+            <p><strong>Amount:</strong> {loan.amount}</p>
+            <p><strong>Interest:</strong> {loan.interestRate}%</p>
+            <p><strong>Duration:</strong> {loan.duration}</p>
+            <p><strong>Approved:</strong> {loan.isApproved ? "Yes" : "No"}</p>
+            <p><strong>Repaid:</strong> {loan.isRepaid ? "Yes" : "No"}</p>
+            {!loan.isApproved && (
+              <button onClick={() => handleApprove(loan.id)}>Approve Loan</button>
+            )}
+            {loan.isApproved && !loan.isRepaid && loan.borrower === account && (
+              <button onClick={() => handleRepay(loan)}>Repay Loan</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-// Load all loan requests
-async function loadLoanRequests() {
-  const loanCount = await contract.methods.nextLoanId().call();  // Get the total number of loan requests
-  loanList.innerHTML = '';  // Clear the existing list
+export default App;
 
-  for (let i = 0; i < loanCount; i
+
+  
+    
